@@ -1,0 +1,7 @@
+Open your computer terminal or command prompt and navigate to your project folder using the cd command.
+Type git init to turn your project folder into a Git repository.
+Type git add . to select all the files in your folder.
+Type git commit -m "Initial commit" to save your files locally with a message.
+Copy the remote URL provided on your new GitHub repository page (it looks like https://github.com).
+Type git remote add origin YOUR_URL_HERE in your terminal to connect your computer to GitHub.
+Type git branch -M main(or master) to set your main branch name.
