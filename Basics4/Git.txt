@@ -13,9 +13,38 @@ You can update a newly added file or folder by staging it with git add, committi
 Step-by-Step Instructions
 Open your computer terminal and go to your project folder using the cd command.
 Type git status to see a list of your newly added or changed files and folders.
-Type git add . to select all new files and folders, or type git add folder_name/file_name to add only a specific item.
-<<<<<<< HEAD
-Type git commit -m "Add new file or folder" to save the changes to your local history with a short note.Type git push to upload your updates to GitHub.
-=======
-Type git commit -m "Add new file or folder" to save the changes to your local history with a short note.Type git push to upload your updates to GitHub.
->>>>>>> b96072ede14e82c14a322bd3b6845c0ec45f64cd
+Type git add . to select all new files and folders, or type git add folder_name/file_name to add only a specific item. )(or)
+Type git add -f path/to/your/file.txt
+
+Type git commit -m "Add new file or folder" to save the changes to your local history with a short note.
+Type git push to upload your updates to GitHub.
+
+git branch
+
+##########################
+
+# 1. Switch to the main branch
+git checkout main
+
+# 2. Pull the latest online changes to be safe
+git pull origin main
+
+# 3. Merge your new files from master into main
+git merge master
+
+# 4. Push the combined updates back to GitHub
+git push origin main
+
+
+#######################
+
+# 1. Stage all changes, including file deletions
+git add -A
+
+# 2. Commit the deletion with a message
+git commit -m "Remove deleted folder"
+
+# 3. Push the update to your master branch
+git push origin master
+
+###############################################
