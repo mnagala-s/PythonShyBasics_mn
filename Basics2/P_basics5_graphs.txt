@@ -1,0 +1,140 @@
+# Install once if needed
+# pip install plotnine plotly
+
+import pandas as pd
+from plotnine import (
+    ggplot, aes, geom_point, geom_abline, geom_histogram,
+    labs, theme_minimal, theme, element_text
+)
+import plotly.express as px
+
+
+###############################################
+1. Scatter plot: mean log2 Control versus mean log2 Treated
+
+scatter_plot = (
+    ggplot(
+        df1,
+        aes(
+            x="Mean_log2_Control",
+            y="Mean_log2_Treated",
+            color="log2_FoldChange_Treated_vs_Control"
+        )
+    )
+    + geom_point(size=2.5, alpha=0.75)
+    + geom_abline(intercept=0, slope=1, linetype="dashed", color="black")
+    + labs(
+        title="Protein abundance: Treated versus Control",
+        x="Mean log2 Intensity - Control",
+        y="Mean log2 Intensity - Treated",
+        color="log2 Fold Change\n(Treated / Control)"
+    )
+    + theme_minimal()
+    + theme(figure_size=(7, 6))
+)
+
+print(scatter_plot)
+
+# Optional: save plot
+scatter_plot.save("scatter_control_vs_treated.png", dpi=300)
+
+
+#######################################################################
+
+
+2. Histogram: distribution of log2 intensitiesFirst, convert the six replicate log2 columns from wide format to long format.
+
+log2_cols = [
+    "log2_CTRL_1", "log2_CTRL_2", "log2_CTRL_3",
+    "log2_TRT_1", "log2_TRT_2", "log2_TRT_3"
+]
+
+# Convert replicate columns into a long-format DataFrame
+df_long = df1.melt(
+    id_vars=["Protein_ID", "Gene_Name"],
+    value_vars=log2_cols,
+    var_name="Sample",
+    value_name="log2Intensity"
+)
+
+# Create group labels
+df_long["Group"] = df_long["Sample"].apply(
+    lambda x: "Control" if "CTRL" in x else "Treated"
+)
+
+# Remove any missing intensity values
+df_long = df_long.dropna(subset=["log2Intensity"])
+
+
+histogram_plot = (
+    ggplot(df_long, aes(x="log2Intensity", fill="Group"))
+    + geom_histogram(
+        bins=30,
+        alpha=0.55,
+        position="identity",
+        color="black"
+    )
+    + labs(
+        title="Distribution of log2 Protein Intensities",
+        x="log2 Intensity",
+        y="Number of measurements",
+        fill="Group"
+    )
+    + theme_minimal()
+    + theme(figure_size=(8, 5))
+)
+
+print(histogram_plot)
+
+# Optional: save plot
+histogram_plot.save("histogram_log2Intensity.png", dpi=300)
+
+
+
+######################################################
+
+3. Interactive Plotly box plot of log2 intensities with hover
+
+
+box_plot = px.box(
+    df_long,
+    x="Group",
+    y="log2Intensity",
+    color="Group",
+    points="all",                 # display individual protein measurements
+    hover_data={
+        "Protein_ID": True,
+        "Gene_Name": True,
+        "Sample": True,
+        "log2Intensity": ":.2f"
+    },
+    title="log2 Protein Intensity by Group",
+    labels={
+        "Group": "Experimental group",
+        "log2Intensity": "log2 Intensity"
+    },
+    color_discrete_map={
+        "Control": "#4C78A8",
+        "Treated": "#E45756"
+    }
+)
+
+box_plot.update_layout(
+    template="plotly_white",
+    width=700,
+    height=550,
+    showlegend=False
+)
+
+box_plot.show()
+
+# Save interactive chart; open the saved HTML file in a browser.
+box_plot.write_html("boxplot_log2Intensity_interactive.html")
+
+###########################################################
+
+
+
+
+
+

@@ -1,0 +1,44 @@
+
+
+import pandas as pd
+
+df1 = pd.read_csv("df_proteomics_logData.csv")
+
+print(df1.head())
+
+df1 = pd.read_csv(r"C:\Users\YourName\Downloads\df_proteomics_logData.csv")
+print(df1.shape)      # rows, columns
+print(df1.columns)
+
+# Print first 3 rows
+print(df1.head(3))
+
+# Print last 3 rows
+print(df1.tail(3))
+
+
+##############################################
+
+
+# Save final DataFrame to an Excel file
+df_filtered.to_excel("df_proteomics_Data.xlsx", index=False)
+
+print("File saved: df_proteomics_Data.xlsx")
+
+#csv
+df_filtered.to_csv("df_proteomics_Data.csv", index=False)
+
+print("File saved: df_proteomics_Data.csv")
+
+########################################################
+#The file is saved in the current working folder where your Python script or Jupyter notebook is running. To see that location:
+import os
+
+print(os.getcwd())
+
+###############################################################
+
+In Jupyter Notebook, you can download the Excel file directly:
+from IPython.display import FileLink
+
+FileLink("df_proteomics_logData.xlsx")

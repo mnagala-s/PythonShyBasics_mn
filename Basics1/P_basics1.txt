@@ -1,0 +1,226 @@
+# 1. Variables and basic types
+name = "Manjula"       # string
+age = 30               # integer
+score = 9.5            # float
+active = True          # boolean
+
+print(name, score)
+
+####################################
+# 2. Lists and dictionaries
+samples = ["A01", "A02", "A03"]
+result = {"sample": "A01", "protein": "P53", "value": 2.8}
+
+print(samples[0])           # A01
+print(result["protein"])    # P53
+
+#####################################
+# 3. Conditions
+value = 2.8
+
+if value > 2:
+    print("High signal")
+else:
+    print("Low signal")
+####################################
+# 4. Loops
+for sample in samples:
+    print(sample)
+
+for i in range(3):
+    print(i)   # 0, 1, 2
+#######################################
+# 5. Functions
+def classify_signal(value, threshold=2.0):
+    if value >= threshold:
+        return "High"
+    return "Low"
+
+print(classify_signal(2.8))
+
+####################################
+# 6. Reading a CSV with pandas
+import pandas as pd
+
+df = pd.read_csv("results.csv")
+print(df.head())
+
+# Filter rows
+high = df[df["value"] >= 2.0]
+high.to_csv("high_signal_results.csv", index=False)
+
+###########################################################
+values = [1.2, 2.8, 0.9, 3.4]
+
+for value in values:
+    label = "High" if value >= 2 else "Low"
+    print(f"{value}: {label}")
+
+#####################################################
+
+import pandas as pd
+
+##########
+#1.Create a DataFrame
+data = {
+    "Sample_ID": ["S01", "S02", "S03", "S04"],
+    "Protein": ["P53", "P53", "EGFR", "EGFR"],
+    "Concentration_ng_ml": [1.2, 2.8, 0.9, 3.4],
+    "Replicate": [1, 1, 1, 1]
+}
+
+df = pd.DataFrame(data)
+print(df)
+######################################
+#2.Read and inspect a CSV or Excel file
+df = pd.read_csv("protein_results.csv")
+# df = pd.read_excel("protein_results.xlsx", sheet_name="Results")
+
+print(df.head())       # First 5 rows
+print(df.columns)      # Column names
+print(df.info())       # Data types and missing values
+print(df.describe())   # Summary statistics for numeric columns
+
+##############################################
+3. Select and filter data
+# One column
+print(df["Protein"])
+
+# Multiple columns
+print(df[["Sample_ID", "Protein", "Concentration_ng_ml"]])
+
+# Filter: only P53
+p53_df = df[df["Protein"] == "P53"]
+
+# Filter: concentration at least 2 ng/mL
+high_signal = df[df["Concentration_ng_ml"] >= 2]
+
+# Multiple conditions
+high_p53 = df[
+    (df["Protein"] == "P53") &
+    (df["Concentration_ng_ml"] >= 2)
+]
+
+print(high_p53)
+
+#############################################
+
+4. Add calculated columns
+
+# Classification
+df["Signal_Class"] = df["Concentration_ng_ml"].apply(
+    lambda x: "High" if x >= 2 else "Low"
+)
+
+# Convert ng/mL to pg/mL
+df["Concentration_pg_ml"] = df["Concentration_ng_ml"] * 1000
+
+print(df)
+
+########################################
+5. Handle missing values
+# Count missing values in every column
+print(df.isna().sum())
+
+# Remove rows with missing concentration
+df_clean = df.dropna(subset=["Concentration_ng_ml"])
+
+# Replace missing concentration with the column median
+df["Concentration_ng_ml"] = df["Concentration_ng_ml"].fillna(
+    df["Concentration_ng_ml"].median()
+)
+
+##################################
+6. Group by protein and calculate summary statistics
+
+summary = (
+    df.groupby("Protein")["Concentration_ng_ml"]
+      .agg(["count", "mean", "median", "std", "min", "max"])
+      .round(2)
+)
+
+print(summary)
+
+##################################################
+7. Average technical replicatesAssuming samples have multiple replicate rows:
+
+average_results = (
+    df.groupby(["Sample_ID", "Protein"], as_index=False)
+      .agg(
+          Mean_Concentration=("Concentration_ng_ml", "mean"),
+          SD_Concentration=("Concentration_ng_ml", "std"),
+          Replicate_Count=("Concentration_ng_ml", "count")
+      )
+)
+
+print(average_results)
+
+############################################################
+
+8. Merge sample metadata with assay results
+
+
+metadata = pd.DataFrame({
+    "Sample_ID": ["S01", "S02", "S03", "S04"],
+    "Treatment": ["Control", "Drug_A", "Control", "Drug_A"],
+    "Batch": ["B1", "B1", "B2", "B2"]
+})
+
+combined = df.merge(metadata, on="Sample_ID", how="left")
+print(combined)
+
+
+######################################################
+
+9. Pivot a long table into a protein-by-sample table
+
+pivot = df.pivot_table(
+    index="Sample_ID",
+    columns="Protein",
+    values="Concentration_ng_ml",
+    aggfunc="mean"
+)
+
+print(pivot)
+
+
+############################################
+10. Export results
+summary.to_csv("protein_summary.csv")
+average_results.to_excel("average_protein_results.xlsx", index=False)
+
+#########################
+
+
+import pandas as pd
+
+df = pd.read_csv("protein_results.csv")
+
+# Clean data
+df = df.dropna(subset=["Sample_ID", "Protein", "Concentration_ng_ml"])
+
+# Add a signal classification
+df["Signal_Class"] = df["Concentration_ng_ml"].apply(
+    lambda x: "High" if x >= 2 else "Low"
+)
+
+# Calculate mean and SD across replicates
+summary = (
+    df.groupby(["Sample_ID", "Protein"], as_index=False)
+      .agg(
+          Mean_ng_ml=("Concentration_ng_ml", "mean"),
+          SD_ng_ml=("Concentration_ng_ml", "std"),
+          N=("Concentration_ng_ml", "count")
+      )
+)
+
+# Save output
+summary.to_excel("protein_assay_summary.xlsx", index=False)
+
+print(summary)
+
+
+
+
+
+

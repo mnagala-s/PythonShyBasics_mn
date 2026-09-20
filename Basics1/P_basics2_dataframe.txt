@@ -1,0 +1,336 @@
+pip install pandas numpy scipy
+#######################
+import pandas as pd
+import numpy as np
+from scipy.stats import ttest_ind
+
+# ---------------------------------------------------------
+# 1. Create a proteomics DataFrame
+# ---------------------------------------------------------
+df = pd.DataFrame({
+    "Protein_ID": ["P001", "P002", "P003", "P004", "P005"],
+    "Gene_Name": ["ACTB", "TP53", "EGFR", "MAPK1", "BRCA1"],
+    "Control_1": [1000, 500, 200, np.nan, 800],
+    "Control_2": [1100, 520, 220, 300, 820],
+    "Control_3": [1050, 480, 210, 310, 790],
+    "Treated_1": [2000, 450, 800, 600, np.nan],
+    "Treated_2": [2100, 470, 850, 620, 1200],
+    "Treated_3": [1900, 460, 780, 610, 1250]
+})
+
+print(df)
+###############################################
+####################################################
+
+# ---------------------------------------------------------
+# 2. Select columns and rows
+# ---------------------------------------------------------
+
+# Select one column by column name
+print(df["Protein_ID"])
+
+# Select multiple columns by column names
+print(df[["Protein_ID", "Gene_Name", "Control_1", "Treated_1"]])
+
+# Select rows by row number: rows 0 to 2
+print(df.iloc[0:3])
+
+# Select a single value by row and column number
+# Row 0, column 2 = Control_1 value for P001
+print(df.iloc[0, 2])
+
+# Select rows and columns by numerical position
+# First 3 rows; columns 0 to 3
+print(df.iloc[0:3, 0:4])
+
+# Select a row using its index label
+print(df.loc[0])
+
+# Select selected rows and named columns
+print(df.loc[0:2, ["Protein_ID", "Control_1", "Treated_1"]])
+
+# Filter rows by a column condition
+print(df[df["Gene_Name"] == "TP53"])
+
+# Filter proteins with Control_1 > 700
+print(df[df["Control_1"] > 700])
+
+#########################################################
+
+
+# ---------------------------------------------------------
+# 3. Create a new column: NA or equation
+# ---------------------------------------------------------
+
+# Create an empty column containing missing values
+df["Notes"] = np.nan
+
+# Create an example log2 column from Control_1
+# log2 is only valid for positive values
+df["log2_Control_1"] = np.log2(df["Control_1"])
+
+print(df[["Protein_ID", "Control_1", "log2_Control_1", "Notes"]])
+
+
+####################################################################
+
+
+# ---------------------------------------------------------
+# 4. Rename columns
+# ---------------------------------------------------------
+
+df = df.rename(columns={
+    "Control_1": "CTRL_1",
+    "Control_2": "CTRL_2",
+    "Control_3": "CTRL_3",
+    "Treated_1": "TRT_1",
+    "Treated_2": "TRT_2",
+    "Treated_3": "TRT_3"
+})
+
+print(df.columns)
+
+
+
+######################################################################
+
+# ---------------------------------------------------------
+# 5. Remove rows with missing values in selected columns
+#    and report the number removed
+# ---------------------------------------------------------
+
+quant_cols = ["CTRL_1", "CTRL_2", "CTRL_3", "TRT_1", "TRT_2", "TRT_3"]
+
+rows_before = len(df)
+
+# Remove a protein row if ANY quantitative replicate is missing
+df_clean = df.dropna(subset=quant_cols).copy()
+
+rows_after = len(df_clean)
+rows_removed = rows_before - rows_after
+
+print(f"Rows before cleaning: {rows_before}")
+print(f"Rows after cleaning:  {rows_after}")
+print(f"Rows removed:         {rows_removed}")
+
+# List the removed proteins
+removed_proteins = df.loc[~df.index.isin(df_clean.index), ["Protein_ID", "Gene_Name"]]
+print("\nRemoved proteins:")
+print(removed_proteins)
+
+#######################################################
+
+# ---------------------------------------------------------
+# 6. Log2-transform quantitative columns and calculate
+#    mean log2 quantity for each protein/group
+# ---------------------------------------------------------
+
+# Proteomics intensities must be greater than zero for log2.
+# Replace zero values with missing values before transformation.
+df_clean[quant_cols] = df_clean[quant_cols].replace(0, np.nan)
+
+# Create log2-transformed replicate columns
+log2_cols = []
+
+for col in quant_cols:
+    new_col = "log2_" + col
+    df_clean[new_col] = np.log2(df_clean[col])
+    log2_cols.append(new_col)
+
+control_log2_cols = ["log2_CTRL_1", "log2_CTRL_2", "log2_CTRL_3"]
+treated_log2_cols = ["log2_TRT_1", "log2_TRT_2", "log2_TRT_3"]
+
+# Mean log2 quantity across three replicates for each group
+df_clean["Mean_log2_Control"] = df_clean[control_log2_cols].mean(axis=1)
+df_clean["Mean_log2_Treated"] = df_clean[treated_log2_cols].mean(axis=1)
+
+print(df_clean[
+    ["Protein_ID", "Mean_log2_Control", "Mean_log2_Treated"]
+])
+
+#######################################################
+
+
+# ---------------------------------------------------------
+# 7. Calculate fold change and p-value
+# ---------------------------------------------------------
+
+# Difference of log2 means = log2 fold change
+# Positive = higher abundance in Treated
+# Negative = lower abundance in Treated
+df_clean["log2_FoldChange_Treated_vs_Control"] = (
+    df_clean["Mean_log2_Treated"] - df_clean["Mean_log2_Control"]
+)
+
+# Convert log2 fold change to ordinary fold change
+df_clean["FoldChange_Treated_vs_Control"] = (
+    2 ** df_clean["log2_FoldChange_Treated_vs_Control"]
+)
+
+# Welch's independent two-sample t-test on log2 intensities.
+# equal_var=False is generally safer when group variances may differ.
+def calculate_pvalue(row):
+    control_values = row[control_log2_cols].astype(float).values
+    treated_values = row[treated_log2_cols].astype(float).values
+
+    test = ttest_ind(
+        treated_values,
+        control_values,
+        equal_var=False,
+        nan_policy="omit"
+    )
+    return test.pvalue
+
+df_clean["p_value"] = df_clean.apply(calculate_pvalue, axis=1)
+
+# Optional: -log10 p-value for volcano plots
+df_clean["minus_log10_pvalue"] = -np.log10(df_clean["p_value"])
+
+# Final results table
+results = df_clean[[
+    "Protein_ID",
+    "Gene_Name",
+    "Mean_log2_Control",
+    "Mean_log2_Treated",
+    "log2_FoldChange_Treated_vs_Control",
+    "FoldChange_Treated_vs_Control",
+    "p_value",
+    "minus_log10_pvalue"
+]].copy()
+
+# Sort: smallest p-value first
+results = results.sort_values("p_value")
+
+print(results)
+
+############################################
+#Example2
+
+#retain a protein only when it has at least two valid, non-zero replicate values in both Control and Treated groups. Convert zeros to missing values first, then count valid replicates before log2 transformation.
+
+
+import pandas as pd
+import numpy as np
+
+control_cols = ["CTRL_1", "CTRL_2", "CTRL_3"]
+treated_cols = ["TRT_1", "TRT_2", "TRT_3"]
+quant_cols = control_cols + treated_cols
+
+# Work on a copy to preserve the original DataFrame
+df_clean = df.copy()
+
+# A zero intensity cannot be log2-transformed.
+# Treat zero as missing data (NaN).
+df_clean[quant_cols] = df_clean[quant_cols].replace(0, np.nan)
+
+# Count valid values separately in each group, per protein row
+df_clean["Valid_Control_Replicates"] = df_clean[control_cols].notna().sum(axis=1)
+df_clean["Valid_Treated_Replicates"] = df_clean[treated_cols].notna().sum(axis=1)
+
+# Keep proteins with at least 2 valid values in BOTH groups
+filter_valid = (
+    (df_clean["Valid_Control_Replicates"] >= 2) &
+    (df_clean["Valid_Treated_Replicates"] >= 2)
+)
+
+rows_before = len(df_clean)
+
+# Valid proteins for downstream log2, fold-change, and t-test analysis
+df_filtered = df_clean.loc[filter_valid].copy()
+
+rows_after = len(df_filtered)
+rows_removed = rows_before - rows_after
+
+print(f"Proteins before filtering: {rows_before}")
+print(f"Proteins retained:         {rows_after}")
+print(f"Proteins removed:          {rows_removed}")
+
+####################################################################
+#To inspect which rows were removed:
+
+removed_rows = df_clean.loc[
+    ~filter_valid,
+    [
+        "Protein_ID",
+        "Gene_Name",
+        "Valid_Control_Replicates",
+        "Valid_Treated_Replicates"
+    ]
+]
+
+print(removed_rows)
+
+#################################################################
+
+#Then perform the log2 transform only on the retained data:
+
+# Log2-transform each quantitative replicate column
+for col in quant_cols:
+    df_filtered["log2_" + col] = np.log2(df_filtered[col])
+
+control_log2_cols = ["log2_CTRL_1", "log2_CTRL_2", "log2_CTRL_3"]
+treated_log2_cols = ["log2_TRT_1", "log2_TRT_2", "log2_TRT_3"]
+
+# Mean log2 abundance uses available valid replicates:
+# either 2 or 3 values per group after filtering.
+df_filtered["Mean_log2_Control"] = df_filtered[control_log2_cols].mean(axis=1)
+df_filtered["Mean_log2_Treated"] = df_filtered[treated_log2_cols].mean(axis=1)
+
+##############################################################################
+#round values
+
+# Round one column to 2 decimal places
+df1["FoldChange_Treated_vs_Control"] = (
+    df1["FoldChange_Treated_vs_Control"].round(2)
+)
+
+
+# Round several result columns:
+
+columns_to_round = [
+    "Mean_log2_Control",
+    "Mean_log2_Treated",
+    "log2_FoldChange_Treated_vs_Control",
+    "FoldChange_Treated_vs_Control",
+    "p_value"
+]
+
+########################################
+
+#To round all numeric columns to two decimal places
+df1 = df1.round(2)
+
+
+
+df1[columns_to_round] = df1[columns_to_round].round(2)
+
+
+##################################
+
+
+# Save final DataFrame to an Excel file
+df_filtered.to_excel("df_proteomics_Data.xlsx", index=False)
+
+print("File saved: df_proteomics_Data.xlsx")
+
+#csv
+df_filtered.to_csv("df_proteomics_Data.csv", index=False)
+
+print("File saved: df_proteomics_Data.csv")
+
+########################################################
+#The file is saved in the current working folder where your Python script or Jupyter notebook is running. To see that location:
+import os
+
+print(os.getcwd())
+
+###############################################################
+
+In Jupyter Notebook, you can download the Excel file directly:
+
+
+
+
+
+
+

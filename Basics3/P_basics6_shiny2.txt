@@ -1,0 +1,150 @@
+#Shiny for Python
+
+pip install shiny pandas plotly
+
+#Create a file called app.py
+
+#Run the app from a terminal in the folder containing app.py
+shiny run --reload app.py
+#Then open the local address shown in the terminal, typically:
+http://127.0.0.1:8000
+########################################
+#For interactive Plotly charts in Shiny for Python, use shinywidgets, which is preferable to @render.plot:
+pip install shinywidgets
+
+Replace ui.output_plot("scatter_plot") with:
+output_widget("scatter_plot")
+
+
+And replace @render.plot with:
+@render_widget
+def scatter_plot():
+    return px.scatter(
+        filtered_data(),
+        x="Mean_log2_Control",
+        y="Mean_log2_Treated",
+        hover_data=["Protein_ID", "Gene_Name"]
+    )
+################################
+
+from shiny import App, ui, render, reactive
+import pandas as pd
+import plotly.express as px
+import numpy as np
+from shinywidgets import output_widget, render_widget
+
+
+# Read your proteomics data
+df1 = pd.read_csv("df_proteomics_logData.csv")
+
+# ----------------------------
+# User interface (UI)
+# ----------------------------
+app_ui = ui.page_fluid(
+    ui.h2("Proteomics Data Explorer"),
+
+    ui.layout_sidebar(
+        ui.sidebar(
+            ui.input_slider(
+                "min_log2fc",
+                "Minimum absolute log2 Fold Change",
+                min=0,
+                max=5,
+                value=1,
+                step=0.1
+            ),
+
+            ui.input_numeric(
+                "max_pvalue",
+                "Maximum p-value",
+                value=0.05,
+                min=0,
+                max=1,
+                step=0.01
+            )
+        ),
+
+        ui.navset_tab(
+            ui.nav_panel(
+                "Results table",
+                ui.output_data_frame("results_table")
+            ),
+
+            ui.nav_panel(
+                "Volcano plot",
+                ui.output_plot("volcano_plot")
+            ),
+
+            ui.nav_panel(
+                "Scatter plot",
+                ui.output_plot("scatter_plot")
+            )
+        )
+    )
+)
+
+# ----------------------------
+# Server logic
+# ----------------------------
+def server(input, output, session):
+
+    @reactive.calc
+    def filtered_data():
+        """Filter proteins based on selected thresholds."""
+        return df1[
+            (df1["log2_FoldChange_Treated_vs_Control"].abs() >= input.min_log2fc()) &
+            (df1["p_value"] <= input.max_pvalue())
+        ].copy()
+
+    @render.data_frame
+    def results_table():
+        return render.DataGrid(
+            filtered_data(),
+            filters=True,
+            selection_mode="rows"
+        )
+
+    @render.plot
+    def volcano_plot():
+        plot_df = df1.copy()
+
+        # Avoid errors from p value of zero
+        plot_df["minus_log10_pvalue"] = -np.log10(
+            plot_df["p_value"].clip(lower=1e-300)
+        )
+
+        fig = px.scatter(
+            plot_df,
+            x="log2_FoldChange_Treated_vs_Control",
+            y="minus_log10_pvalue",
+            hover_data=["Protein_ID", "Gene_Name", "p_value"],
+            title="Volcano Plot"
+        )
+
+        return fig
+
+    @render.plot
+    def scatter_plot():
+        fig = px.scatter(
+            filtered_data(),
+            x="Mean_log2_Control",
+            y="Mean_log2_Treated",
+            hover_data=["Protein_ID", "Gene_Name", "p_value"],
+            title="Control vs Treated"
+        )
+
+        return fig
+
+# ----------------------------
+# Create app
+# ----------------------------
+app = App(app_ui, server)
+
+
+#############################################################################
+
+
+
+
+
+

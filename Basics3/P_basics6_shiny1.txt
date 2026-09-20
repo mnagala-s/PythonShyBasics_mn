@@ -1,0 +1,299 @@
+#1. Essential app structure
+###############################
+# 1. Imports
+from shiny import App, ui, render, reactive
+
+# 2. Load data
+# df1 = ...
+
+# 3. Build the page
+app_ui = ui.page_fluid(
+    # inputs
+    # outputs
+)
+
+# 4. Define calculations and outputs
+def server(input, output, session):
+    # @reactive.calc
+    # @render.text / @render.data_frame / @render_widget
+    pass
+
+# 5. Connect UI and server
+app = App(app_ui, server)
+
+
+##########################################################
+#The most important concepts are:
+
+ui      Builds the visible webpage
+input   Reads values selected or entered by the user
+output   A named location on the page where a result appears
+@render...Tells Shiny how to create an output
+@reactive.calc Creates an automatically updating calculation
+App(app_ui, server)  Connects page design and Python logic
+
+######################################################
+
+#Basics
+
+pip install shiny
+
+1. Smallest Shiny app
+
+from shiny import App, ui, render
+
+app_ui = ui.page_fluid(
+    ui.h1("My first Shiny app"),
+    ui.input_text("name", "Enter your name", value="Manjula"),
+    ui.output_text("greeting")
+)
+
+def server(input, output, session):
+
+    @render.text
+    def greeting():
+        return f"Hello, {input.name()}!"
+
+app = App(app_ui, server)
+
+##############################################
+
+Run it:
+
+shiny run --reload app.py
+
+input.name() reads the current value of the UI item whose ID is "name".ui.output_text("greeting") reserves a page location, and the function named greeting() supplies its content.
+
+#########################################
+
+2. Common input controls
+
+app_ui = ui.page_fluid(
+    ui.h2("Inputs"),
+
+    ui.input_text("protein", "Protein ID", value="P001"),
+
+    ui.input_numeric(
+        "threshold",
+        "Minimum intensity",
+        value=10,
+        min=0
+    ),
+
+    ui.input_slider(
+        "log2fc",
+        "Minimum absolute log2 fold change",
+        min=0,
+        max=5,
+        value=1,
+        step=0.1
+    ),
+
+    ui.input_select(
+        "group",
+        "Select group",
+        choices=["Control", "Treated"]
+    ),
+
+    ui.input_checkbox(
+        "show_table",
+        "Show results table",
+        value=True
+    ),
+
+    ui.output_text_verbatim("selected_values")
+)
+
+#################################################################
+
+def server(input, output, session):
+
+    @render.text
+    def selected_values():
+        return (
+            f"Protein: {input.protein()}\n"
+            f"Threshold: {input.threshold()}\n"
+            f"log2FC: {input.log2fc()}\n"
+            f"Group: {input.group()}"
+        )
+
+###################################################################
+#Useful input pattern:
+
+ui.input_type("input_id", "Label shown to user", ...)
+
+#The input_id connects UI and server code.
+
+#############################################################
+
+3. Reactive calculationsUse @reactive.calc for a calculation that depends on inputs and can be reused by more than one output.
+
+from shiny import App, ui, render, reactive
+import pandas as pd
+
+df1 = pd.read_csv("df_proteomics_logData.csv")
+
+app_ui = ui.page_fluid(
+    ui.input_slider(
+        "minimum_fc",
+        "Minimum absolute log2 fold change",
+        min=0,
+        max=5,
+        value=1,
+        step=0.1
+    ),
+
+    ui.output_text("protein_count"),
+    ui.output_data_frame("protein_table")
+)
+
+def server(input, output, session):
+
+    @reactive.calc
+    def filtered_data():
+        return df1[
+            df1["log2_FoldChange_Treated_vs_Control"].abs()
+            >= input.minimum_fc()
+        ].copy()
+
+    @render.text
+    def protein_count():
+        return f"Proteins passing filter: {len(filtered_data())}"
+
+    @render.data_frame
+    def protein_table():
+        return render.DataGrid(filtered_data(), filters=True)
+
+app = App(app_ui, server)
+
+
+
+###########################################################
+
+from shiny import App, ui, render, reactive
+import pandas as pd
+
+df1 = pd.read_csv("df_proteomics_logData.csv")
+
+app_ui = ui.page_fluid(
+    ui.input_slider(
+        "minimum_fc",
+        "Minimum absolute log2 fold change",
+        min=0,
+        max=5,
+        value=1,
+        step=0.1
+    ),
+
+    ui.output_text("protein_count"),
+    ui.output_data_frame("protein_table")
+)
+
+def server(input, output, session):
+
+    @reactive.calc
+    def filtered_data():
+        return df1[
+            df1["log2_FoldChange_Treated_vs_Control"].abs()
+            >= input.minimum_fc()
+        ].copy()
+
+    @render.text
+    def protein_count():
+        return f"Proteins passing filter: {len(filtered_data())}"
+
+    @render.data_frame
+    def protein_table():
+        return render.DataGrid(filtered_data(), filters=True)
+
+app = App(app_ui, server)
+
+#The important point is that whenever the slider changes, filtered_data() is recalculated automatically. Both the count and table then update.
+
+#######################################################
+
+4. Layout: sidebar and tabs
+
+app_ui = ui.page_fluid(
+    ui.h2("Proteomics Explorer"),
+
+    ui.layout_sidebar(
+        ui.sidebar(
+            ui.input_slider(
+                "minimum_fc",
+                "Minimum |log2FC|",
+                min=0, max=5, value=1, step=0.1
+            )
+        ),
+
+        ui.navset_tab(
+            ui.nav_panel(
+                "Table",
+                ui.output_data_frame("protein_table")
+            ),
+            ui.nav_panel(
+                "Summary",
+                ui.output_text("protein_count")
+            )
+        )
+    )
+)
+
+########################################################
+
+
+ui.sidebar(...): left-side 
+controls
+ui.navset_tab(...): tabs
+ui.nav_panel(...): contents of each tab
+####################################################
+5. Display a Plotly interactive plot
+
+pip install plotly shinywidgets
+
+Use shinywidgets for Plotly plots, rather than ordinary static plotting output.
+
+from shinywidgets import output_widget, render_widget
+import plotly.express as px
+
+
+output_widget("scatter_plot")
+
+##############################
+server
+
+@render_widget
+def scatter_plot():
+    return px.scatter(
+        filtered_data(),
+        x="Mean_log2_Control",
+        y="Mean_log2_Treated",
+        hover_data=[
+            "Protein_ID",
+            "Gene_Name",
+            "log2_FoldChange_Treated_vs_Control",
+            "p_value"
+        ],
+        title="Control versus Treated"
+    )
+
+##############################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

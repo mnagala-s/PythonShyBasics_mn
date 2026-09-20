@@ -1,0 +1,128 @@
+# Install once, if needed
+# pip install plotly pandas
+
+import pandas as pd
+import plotly.express as px
+
+#1. Interactive scatter: Control vs Treated mean log2 intensity
+
+fig_scatter = px.scatter(
+    df1,
+    x="Mean_log2_Control",
+    y="Mean_log2_Treated",
+    color="log2_FoldChange_Treated_vs_Control",
+    hover_data={
+        "Protein_ID": True,
+        "Gene_Name": True,
+        "Mean_log2_Control": ":.2f",
+        "Mean_log2_Treated": ":.2f",
+        "log2_FoldChange_Treated_vs_Control": ":.2f",
+        "p_value": ":.3g"
+    },
+    color_continuous_scale="RdBu_r",
+    title="Mean log2 Intensity: Treated vs Control",
+    labels={
+        "Mean_log2_Control": "Mean log2 Intensity - Control",
+        "Mean_log2_Treated": "Mean log2 Intensity - Treated",
+        "log2_FoldChange_Treated_vs_Control": "log2FC"
+    }
+)
+
+# Add equal-intensity diagonal line
+min_value = min(df1["Mean_log2_Control"].min(), df1["Mean_log2_Treated"].min())
+max_value = max(df1["Mean_log2_Control"].max(), df1["Mean_log2_Treated"].max())
+
+fig_scatter.add_shape(
+    type="line",
+    x0=min_value, y0=min_value,
+    x1=max_value, y1=max_value,
+    line=dict(color="black", dash="dash")
+)
+
+fig_scatter.update_layout(template="plotly_white")
+fig_scatter.show()
+
+##################################################################
+
+2. Interactive histogram of log2 intensity
+
+log2_cols = [
+    "log2_CTRL_1", "log2_CTRL_2", "log2_CTRL_3",
+    "log2_TRT_1", "log2_TRT_2", "log2_TRT_3"
+]
+
+df_long = df1.melt(
+    id_vars=["Protein_ID", "Gene_Name"],
+    value_vars=log2_cols,
+    var_name="Sample",
+    value_name="log2Intensity"
+).dropna(subset=["log2Intensity"])
+
+df_long["Group"] = df_long["Sample"].str.contains("CTRL").map(
+    {True: "Control", False: "Treated"}
+)
+
+fig_hist = px.histogram(
+    df_long,
+    x="log2Intensity",
+    color="Group",
+    nbins=30,
+    barmode="overlay",
+    opacity=0.60,
+    hover_data=["Protein_ID", "Gene_Name", "Sample"],
+    title="Distribution of log2 Protein Intensities",
+    labels={"log2Intensity": "log2 Intensity"}
+)
+
+fig_hist.update_layout(template="plotly_white")
+fig_hist.show()
+
+##################################################################
+
+3. Interactive box plot with protein-level hover
+
+fig_box = px.box(
+    df_long,
+    x="Group",
+    y="log2Intensity",
+    color="Group",
+    points="all",
+    hover_data={
+        "Protein_ID": True,
+        "Gene_Name": True,
+        "Sample": True,
+        "log2Intensity": ":.2f"
+    },
+    title="log2 Protein Intensity by Experimental Group",
+    labels={
+        "Group": "Group",
+        "log2Intensity": "log2 Intensity"
+    },
+    color_discrete_map={
+        "Control": "#377eb8",
+        "Treated": "#e41a1c"
+    }
+)
+
+fig_box.update_layout(
+    template="plotly_white",
+    showlegend=False
+)
+
+fig_box.show()
+
+################################################################################
+
+Save any interactive Plotly figure as an HTML file:
+
+fig_box.write_html("boxplot_log2Intensity.html")
+fig_scatter.write_html("scatter_control_vs_treated.html")
+fig_hist.write_html("histogram_log2Intensity.html")
+
+
+
+
+
+
+
+
